@@ -1,0 +1,369 @@
+---
+title: "Bayer Business Intelligence Analysis"
+subtitle: "Focus: Manufacturer 1"
+author: "Camilla Yu"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggstatsplot)
+library(GGally)
+library(ggpubr)
+```
+
+```{r, echo=FALSE}
+data <- read_excel("bayer intern2.xlsx")
+data <- as.data.frame(data)
+```
+
+```{r, echo=FALSE}
+data <- data %>% 
+  select(-Market) %>%
+  mutate(dollar = `Dollar Sales`,
+         dollar_last = `Dollar Sales Year Ago`) %>%
+  select(-c(`Dollar Sales`, `Dollar Sales Year Ago`))
+```
+
+```{r, echo=FALSE}
+data_part <- data[3:nrow(data),]
+```
+
+## Background 
+
+For this report, there are two types of categories: analgesics and upper 
+respiratory. Manufacturers include MFC 1, MFC 2, MFC 3, MFC 4, MFC 5, MFC 6 and 
+MFC 7 with many different brands. Based on the data, we have dollar sales as
+well as dollar sales in the last year. The report is separated into three 
+parts: 1.General glimpse for the whole market, 2.Manufacture 1 (MFR 1)'s 
+performance compared to the market, and 3.Market share in this year and last 
+year. 
+
+## 1. General glimpse for the whole market
+
+We could make separate histograms for analgesics and upper respiratory with colors
+indicating different years. 
+
+```{r, echo=FALSE}
+analgesics <- data_part %>% filter(Category == "ANALGESICS")
+upper <- data_part %>% filter(Category == "UPPER RESPIRATORY")
+```
+
+```{r, echo=FALSE}
+dollar <- data.frame(dollar = analgesics$dollar, type = "This Year", manufacturer = analgesics$Manufacturer)
+dollar_last <- data.frame(dollar = analgesics$dollar_last, type = "Last Year", manufacturer = analgesics$Manufacturer)
+analgesics_dollar <- rbind(dollar, dollar_last)
+analgesics_dollar <- analgesics_dollar %>%
+  mutate(dollar = round(dollar/1000000), n = 2)
+```
+
+```{r, echo=FALSE}
+p1 <- ggplot(analgesics_dollar, aes(x = manufacturer, y = dollar, fill = type)) +
+  geom_bar(position=position_dodge(), stat = "identity", colour = "black") +
+  labs(title = "Dollar Sales for Analgesics",
+       x = "Manufacturer",
+       y = "Dollar in hundred thousand") +
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+```{r, echo=FALSE}
+dollar <- data.frame(dollar = upper$dollar, type = "This Year", manufacturer = upper$Manufacturer)
+dollar_last <- data.frame(dollar = upper$dollar_last, type = "Last Year", manufacturer = upper$Manufacturer)
+upper_dollar <- rbind(dollar, dollar_last)
+upper_dollar <- upper_dollar %>%
+  mutate(dollar = round(dollar/1000000), n = 2)
+```
+
+```{r, echo=FALSE}
+p2 <- ggplot(upper_dollar, aes(x = manufacturer, y = dollar, fill = type)) +
+  geom_bar(position=position_dodge(), stat = "identity", colour = "black") +
+  labs(title = "Dollar Sales for Upper Respiratory",
+       x = "Manufacturer",
+       y = "Dollar in hundred thousand") +
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+```{r, fig.width=9, fig.height=3, echo=FALSE}
+ggarrange(p1, p2, ncol = 2, nrow = 1)
+```
+
+Based on the plot, we could have a general sense that dollar sales for upper respiratory 
+are better than it for analgesics. And for analgesics, dollar sales in this year 
+for most of the manufacturers increase compared to it in the last year. But for
+upper respiratory, dollar sales in this year for roughly half of the manufacturers
+decrease compared to it in the last year. We could research more about the 
+decreasing trend in dollar sales for upper respiratory to capture the future 
+trend and make adjustments for better adapting the market. 
+
+- For analgesics, MFR 3 has the highest dollar sales in both this year and last
+year, followed by MFR 2. MFR 1 did better than half of the manufactures, and
+MFR 1, MFR 2 and MFR 3 have two different brands for analgesics.
+
+- For upper respiratory, MFR 5 has the highest dollar sales in this year, while
+MFR 6 has the highest dollar sales in the last year, followed by MFR 1 and MFR 3.
+
+- MFR 1 did better than roughly 75% of the manufactures. MFR 3 and MFR6 have 
+two different brands for upper respiratory.
+
+
+```{r, echo=FALSE}
+MFR1_this <- data.frame(type = "This Year", dollar = c(261, 198), brand = c("MFR 1 Brand 3", "MFR 1 Brand 5"))
+MFR1_last <- data.frame(type = "Last Year", dollar = c(285, 192), brand = c("MFR 1 Brand 3", "MFR 1 Brand 5"))
+MFR1_analgesics <- rbind(MFR1_this, MFR1_last)
+```
+
+```{r, echo=FALSE}
+is_outlier <- function(x) {
+  return(x < quantile(x, 0.25) - 1.5 * IQR(x) | x > quantile(x, 0.75) + 1.5 * IQR(x))
+}
+
+dat <- analgesics_dollar %>% tibble::rownames_to_column(var="outlier") %>% group_by(type) %>% mutate(outlier=ifelse(is_outlier(dollar), manufacturer, as.numeric(NA)))
+
+p3 <- ggplot(dat, aes(y=dollar, x=type, fill = type)) + geom_boxplot() + geom_text(aes(label=outlier),na.rm=TRUE,hjust=0.5, vjust=-0.5, size=3) +
+  labs(title = "Analgesics Dollar Sales", 
+            y = "Dollar in hundred thousand",
+            x = "") +
+  geom_point(data = MFR1_analgesics, aes(x= type, y = dollar), color = "blue") +
+  geom_text(data = MFR1_analgesics, aes(label = brand), color = "blue",
+            hjust=0.5, vjust=-1, size=3) +
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+```{r, echo=FALSE}
+upper_this <- data.frame(dollar = upper$dollar, type = "This Year", manufacturer = analgesics$Manufacturer)
+upper_last <- data.frame(dollar = upper$dollar_last, type = "Last Year", manufacturer = analgesics$Manufacturer)
+upper_dollar <- rbind(upper_this, upper_last)
+upper_dollar <- upper_dollar %>%
+  mutate(dollar = round(dollar/1000000), n = 2)
+```
+
+```{r, echo=FALSE}
+MFR1_this <- data.frame(type = "This Year", dollar = 511, brand = "MFR 1 Brand 13")
+MFR1_last <- data.frame(type = "Last Year", dollar = 481, brand = "MFR 1 Brand 13")
+MFR1_analgesics <- rbind(MFR1_this, MFR1_last)
+```
+
+```{r, echo=FALSE}
+is_outlier <- function(x) {
+  return(x < quantile(x, 0.25) - 1.5 * IQR(x) | x > quantile(x, 0.75) + 1.5 * IQR(x))
+}
+
+dat <- upper_dollar %>% tibble::rownames_to_column(var="outlier") %>% group_by(type) %>% mutate(outlier=ifelse(is_outlier(dollar), manufacturer, as.numeric(NA)))
+
+p4 <- ggplot(dat, aes(y=dollar, x=type, fill = type)) + geom_boxplot() + geom_text(aes(label=outlier),na.rm=TRUE,hjust=0.5, vjust=-0.5, size=3) +
+  labs(title = "Upper Respiratory Dollar Sales", 
+            y = "Dollar in hundred thousand",
+            x = "") +
+  geom_point(data = MFR1_analgesics, aes(x= type, y = dollar), color = "blue") +
+  geom_text(data = MFR1_analgesics, aes(label = brand), color = "blue",
+            hjust=0.5, vjust=-1, size=3) +
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+
+## 2. Manufacture 1 (MFR 1)'s performance compared to the market
+
+### Analgesics:
+
+```{r, echo=FALSE}
+upper <- upper %>%
+  mutate(perc = round((dollar - dollar_last)/dollar_last * 100, 2))
+analgesics <- analgesics %>%
+  mutate(perc = round((dollar - dollar_last)/dollar_last * 100, 2))
+data <-rbind(upper, analgesics) %>% 
+  mutate(category = as.character(tolower(Category)))
+```
+
+```{r, echo=FALSE}
+MFR1_ana <- data.frame(category = "analgesics", perc = c(round((260846516 - 284658263)/284658263*100, 2), round((197902438 - 191812842)/191812842*100, 2)), brand = c("MFR 1 Brand 3", "MFR 1 Brand 5"))
+MFR1_upper <- data.frame(category = "upper respiratory", perc = round((510499642 - 481175624)/481175624*100, 2), brand = "MFR 1 Brand 13")
+MFR1_perc <- rbind(MFR1_ana, MFR1_upper)
+```
+
+```{r, echo=FALSE}
+dat <- data %>% tibble::rownames_to_column(var="outlier") %>% mutate(outlier=ifelse(is_outlier(perc), Manufacturer, as.numeric(NA)))
+
+p5 <- ggplot(dat, aes(y=perc, x=category, fill = category)) + geom_boxplot() + geom_text(aes(label=outlier),na.rm=TRUE,hjust=0.5, vjust=-0.5, size=3) +
+  labs(title = "Sales Growth Rate", 
+            y = "Growth rate in percentage",
+            x = "") + 
+  geom_point(data = MFR1_perc, aes(x= category, y = perc), color = "blue") +
+  geom_text(data = MFR1_perc, aes(label = brand), color = "blue",
+            hjust=0.5, vjust=-1, size=3) +
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+```{r, echo=FALSE}
+p3
+```
+
+- In general, MFR 1 did a great job since no matter for which brand or year, 
+the dollar sales are above the median compared to the whole market.
+
+- For MFR 1, dollar sales for brand 3 are larger than it for brand 5. So, MFR 1 
+could research more about the differences between two brands to improve the 
+performance for brand 5.
+
+- MFR 3 and MFR 2 did a weigh better job than the rest of the market, MFR 1 could 
+study from them and improve two brands.
+
+- For MFR 1, brand 5 sold more in this year while brand 3 sold less compared to 
+it in the last year, MFR 1 could research the reasons for increasing trend for 
+brand 5 to increase dollalr sales for brand 3 and keep the increasing trend for 
+both two brands.
+
+- The gap for the whole market in this year decreases compared to it in the last
+year. MFR 1 could study more about the trend for the whole market and adapt to
+it in the future. For this year, the market for analgesics seems to be more
+competitive than the last year. 
+
+### Upper Respiratory:
+
+```{r, echo=FALSE}
+p4
+```
+
+- MFR 1's dollar sales for upper respiratory are above 75% of the manufacturers 
+no matter for this year or last year and did a great job. 
+
+- The 75% percentile for dollar sales for the whole market 
+in this year increases compared to it in the last year but the gap or difference 
+between manufacturers in dollar sales for this year increases. And it's beneficial 
+to think about the reason behind the fact so that MFR 1 could improve the 
+performance while avoiding the decreasing trend. 
+
+- For MFR 1, the dollar sales for upper respiratory in this year is larger than 
+it in the last year, and if MFR 1 could investigate the reason for increasing 
+sales, it might be useful for later successes. 
+
+### Growth Rate
+
+```{r, echo=FALSE}
+p5
+```
+
+- For both analgesics and upper respiratory, more than half of the 
+manufacturers have positive growth rate in dollar sales.
+
+- In general, the median growth rate for upper respiratory is larger than it for
+analgesics. If MFR 1 could research the reason for why the growth rate is larger
+for upper respiratory, they could have more successful strategies or design 
+more products which cater to the market demand. 
+
+- Based on the plot, we could confirm the findings from previous sections that 
+brand 5 for analgesics and brand 13 for upper respiratory have positive growth 
+rate, while brand 3 for analgesics has negative growth rate. So, MFR 1 needs to 
+investigate the reason for negative growth rate and learn from it to avoid it in 
+the future.
+
+- It's also beneficial to learn cases from MFR 6 to avoid such a large negative
+growth rate in the future.
+
+## 3. Market share in this year and last year
+
+```{r, echo=FALSE}
+data <- read_excel("bayer intern2.xlsx")
+data <- as.data.frame(data)
+```
+
+```{r, echo=FALSE}
+data <- data %>% 
+  select(-Market) %>%
+  mutate(dollar = `Dollar Sales`,
+         dollar_last = `Dollar Sales Year Ago`) %>%
+  select(-c(`Dollar Sales`, `Dollar Sales Year Ago`))
+```
+
+```{r, echo=FALSE}
+pie_ana <- data %>% filter(Category == "ANALGESICS") %>%
+  group_by(Manufacturer) %>%
+  summarise(dollar = sum(dollar),
+            dollar_last = sum(dollar_last))
+```
+
+```{r, echo=FALSE}
+pie_ana_this <- pie_ana %>% arrange(desc(dollar)) %>%
+  mutate(prop = round(dollar / sum(dollar) *100, 1))
+```
+
+```{r, echo=FALSE}
+pie_ana_last <- pie_ana %>% arrange(desc(dollar_last)) %>%
+  mutate(prop = round(dollar_last / sum(dollar_last) *100, 1))
+```
+
+```{r, echo=FALSE}
+pie_ana_plot <- ggplot(pie_ana_this, aes(x="", y=prop, fill=Manufacturer)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  labs(title = " This Year") +
+  scale_fill_brewer(palette="Set1") +
+  theme(plot.title = element_text(hjust=0.5))
+pie_ana_last <- ggplot(pie_ana_last, aes(x="", y=prop, fill=Manufacturer)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  labs(title = "Last Year") +
+  scale_fill_brewer(palette="Set1") +
+  theme(plot.title = element_text(hjust=0.5))
+plot<- ggarrange(pie_ana_plot,pie_ana_last,ncol=2, nrow=1, common.legend = TRUE,legend="bottom")
+annotate_figure(plot, top = text_grob("Sales Proportion for Analgesics", 
+               color = "black", face = "bold", size = 14))
+```
+
+- The market share for analgesics in this year and last year are pretty similar.
+
+- All other manufacturers has the largest market share for analgesics and that
+makes sense since the category might include many manufacturers together.
+
+- MFR 3 has the second largest market share for analgesics, followed by MFR 2
+and MFR 1. Learning from MFR 3 might be beneficial for MFR 1.
+
+```{r, echo=FALSE}
+pie_upper <- data %>% filter(Category == "UPPER RESPIRATORY") %>%
+  group_by(Manufacturer) %>%
+  summarise(dollar = sum(dollar),
+            dollar_last = sum(dollar_last))
+```
+
+```{r, echo=FALSE}
+pie_up_this <- pie_upper %>% arrange(desc(dollar)) %>%
+  mutate(prop = dollar / sum(dollar) *100)
+```
+
+```{r, echo=FALSE}
+pie_up_last <- pie_upper %>% arrange(desc(dollar_last)) %>%
+  mutate(prop = dollar_last / sum(dollar_last) *100)
+```
+
+```{r, echo=FALSE}
+pie_up_plot <- ggplot(pie_up_this, aes(x="", y=prop, fill=Manufacturer)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  labs(title = " This Year") +
+  scale_fill_brewer(palette="Set1") +
+  theme(plot.title = element_text(hjust=0.5))
+pie_up_last <- ggplot(pie_up_last, aes(x="", y=prop, fill=Manufacturer)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  labs(title = "Last Year") +
+  scale_fill_brewer(palette="Set1") +
+  theme(plot.title = element_text(hjust=0.5))
+plot<- ggarrange(pie_up_plot,pie_up_last,ncol=2, nrow=1, common.legend = TRUE,legend="bottom")
+annotate_figure(plot, top = text_grob("Sales Proportion for Upper Respiratory", 
+               color = "black", face = "bold", size = 14))
+```
+
+- The findings of market share for upper respiratory are pretty similar to what
+I found in market share for analgesics.
+
+- Except for all other manufacturers, the market share for the rest of 
+manufacturers are pretty even, which might indicate that the market is competitive
+for upper respiratory. Learning from other manufacturers or dig into the reasons
+for competitive market might be beneficial for MFR 1. 

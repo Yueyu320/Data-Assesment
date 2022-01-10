@@ -1,0 +1,358 @@
+---
+title: "Acumen_Data_Analysis"
+author: "Camilla Yu"
+date: "12/22/2021"
+output: pdf_document
+---
+
+1. 
+
+```{r setup, include=FALSE}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggstatsplot)
+library(GGally)
+library(ggpubr)
+```
+
+```{r}
+data_original <- read_excel("Acuman.xlsx")
+data_original <- as.data.frame(data_original)
+colnames(data_original) <- c("observation_num", "quarter", "id", "sex", "race", "age", "hospi", "salary", "score")
+```
+
+```{r}
+length(unique(data_original$id))
+```
+
+```{r}
+data_clean <- data_original %>%
+  select(-observation_num) %>% 
+  mutate(quarter = as.factor(quarter),
+         sex = as.factor(sex),
+         race = as.factor(race),
+         hospi = as.factor(hospi))
+```
+
+```{r}
+summary(data_clean$age)
+```
+
+```{r}
+unique(data_clean$id[which(data_clean$age >= 100)])
+```
+
+```{r}
+unique(data_clean$id[which(data_clean$age < 20)])
+```
+
+```{r}
+length(data_clean$score[which(data_clean$score >= 6)])
+```
+
+```{r}
+length(data_clean$score[which(data_clean$score == 10)])
+```
+
+```{r}
+length(data_clean$sex[which(is.na(data_clean$sex))])
+```
+
+```{r}
+unique(data_clean$id[which(is.na(data_clean$sex))])
+```
+
+```{r}
+length(data_clean$race[which(is.na(data_clean$race))])
+```
+
+```{r}
+length(unique(data_clean$id[which(is.na(data_clean$race))]))
+```
+
+```{r}
+length(data_clean$score[which(is.na(data_clean$score))])
+```
+
+2.
+
+```{r}
+sex_unique <- data_clean %>%
+  select(id, sex) %>%
+  unique()
+```
+
+```{r}
+sex_unique %>% 
+  count(sex) %>%
+  mutate(percentage = n/sum(n))
+```
+
+```{r}
+sex_data <- data.frame(sex = c("Female", "Male", "NA"), 
+                       Percentage = c("49.24%", "50.41%", "0.36%"),
+                       decimals = c(0.4924, 0.5041, 0.0036))
+
+lbls <- paste(sex_data$sex, sex_data$Percentage, sep = " ")
+```
+
+```{r}
+pie(sex_data$decimals, labels = lbls)
+```
+
+```{r}
+race_unique <- data_clean %>%
+  select(id, race) %>%
+  unique()
+```
+
+```{r}
+race_unique %>% 
+  count(race) %>%
+  mutate(percentage = n/sum(n))
+```
+
+```{r}
+race_data <- data.frame(race = c("1", "2", "3", "NA"), 
+                       Percentage = c("49.39%", "25.84%", "13.56%", "11.21%"),
+                       decimals = c(0.4939, 0.2584, 0.1356, 0.1121))
+
+lbls <- paste(race_data$race, race_data$Percentage, sep = ": ")
+```
+
+```{r}
+pie(race_data$decimals, labels = lbls)
+```
+
+```{r}
+age_data <- data_clean %>%
+  select(age, id) %>%
+  round()
+```
+
+```{r}
+age_data <- age_data %>%
+  group_by(id) %>%
+  summarise(age = max(age)) %>%
+  filter(age < 100) %>%
+  filter(age >= 20)
+```
+
+
+```{r}
+summary(age_data$age)
+```
+
+```{r}
+ggplot(age_data) +
+  geom_boxplot(aes(x = age))
+```
+
+```{r}
+data_clean %>% 
+  count(hospi) %>%
+  mutate(percentage = n/sum(n))
+```
+
+```{r}
+hos_data <- data.frame(hos = c("No", "Yes"), 
+                       Percentage = c("88.86%", "11.14%"),
+                       decimals = c(0.8886, 0.1114))
+
+lbls <- paste(hos_data$hos, hos_data$Percentage, sep = " ")
+```
+
+```{r}
+pie(hos_data$decimals, labels = lbls)
+```
+
+```{r}
+salary_unique <- data_clean %>%
+  select(id, salary) %>%
+  group_by(id) %>%
+  summarise(salary = max(salary))
+```
+
+```{r}
+summary(salary_unique$salary)
+```
+
+```{r}
+ggplot(salary_unique) +
+  geom_boxplot(aes(x = salary))
+```
+
+```{r}
+data_abnorm <- data_clean[which(data_clean$score == 10),]
+```
+
+```{r}
+data_norm <- data_clean[which(data_clean$score != 10),]
+```
+
+```{r}
+summary(data_clean$score)
+```
+
+```{r}
+ggplot(data_clean) +
+  geom_boxplot(aes(x = score))
+```
+
+```{r}
+summary(data_norm$score)
+```
+
+```{r}
+ggplot(data_norm) +
+  geom_boxplot(aes(x = score))
+```
+
+```{r}
+hospi_quar <- data_clean %>%
+  group_by(quarter) %>%
+  count(hospi) %>%
+  mutate(perc = n/sum(n))
+```
+
+```{r}
+hospi_0 <- hospi_quar[which(hospi_quar$hospi == 0), ] %>%
+  select(-c(hospi, n)) %>%
+  mutate(hospi = 0)
+hospi_1 <- hospi_quar[which(hospi_quar$hospi == 1), ] %>%
+  select(-c(hospi, n)) %>%
+  mutate(hospi = 1)
+hospi_data <- rbind(hospi_0, hospi_1)
+hospi_data <- hospi_data %>%
+  mutate(hospi = as.factor(hospi))
+```
+
+```{r}
+ggplot(hospi_data, aes(x = quarter, y = perc, col = hospi)) +
+  geom_point() + geom_line()
+```
+
+```{r}
+boxplot(data_clean$salary ~ data_clean$quarter, ylab = "Salary",
+        xlab = "Quarters")
+```
+
+```{r}
+boxplot(data_clean$score ~ data_clean$quarter, ylab = "Health scores",
+        xlab = "Quarters")
+```
+
+```{r}
+boxplot(data_norm$score ~ data_norm$quarter, ylab = "Health scores",
+        xlab = "Quarters")
+```
+
+3.
+
+Before dropping abnormal health scores: 
+
+```{r}
+boxplot(data_clean$score~data_clean$sex, ylab = "Health scores", xlab = "Sex")
+```
+
+```{r}
+boxplot(data_clean$score~data_clean$race, ylab = "Health scores", xlab = "Race")
+```
+
+```{r}
+age_clean <- data_clean %>%
+  filter(age < 100) %>%
+  filter(age >= 20)
+```
+
+```{r}
+ggplot(age_clean, aes(x = age, y = score)) + geom_point() + geom_smooth(method='lm')
+```
+
+```{r}
+boxplot(data_clean$score~data_clean$hospi, ylab = "Health scores", xlab = "Hospital visiting")
+```
+
+```{r}
+ggplot(data_clean, aes(x = salary, y = score)) + geom_point() + geom_smooth(method='lm')
+```
+
+After dropping abnormal health scores: 
+
+```{r}
+boxplot(data_norm$score~data_norm$sex, ylab = "Health scores", xlab = "Sex")
+```
+
+```{r}
+boxplot(data_norm$score~data_norm$race, ylab = "Health scores", xlab = "Race")
+```
+
+```{r}
+age_clean <- data_norm %>%
+  filter(age < 100) %>%
+  filter(age >= 20)
+```
+
+```{r}
+ggplot(age_clean, aes(x = age, y = score)) + geom_point() + geom_smooth(method='lm')
+```
+
+```{r}
+boxplot(data_norm$score~data_norm$hospi, ylab = "Health scores", xlab = "Hospital visiting")
+```
+
+```{r}
+ggplot(data_norm, aes(x = salary, y = score)) + geom_point() + geom_smooth(method='lm')
+```
+
+4.
+
+```{r}
+data_norm <- data_norm %>%
+  filter(age < 100) %>%
+  filter(age >= 20) %>%
+  select(-id) %>%
+  mutate(quarter = as.factor(quarter),
+         sex = as.factor(sex),
+         race = as.factor(race),
+         hospi = as.factor(hospi)) %>%
+  na.omit()
+```
+
+```{r}
+lm_data <- fastDummies::dummy_cols(data_norm,
+                                   remove_first_dummy = TRUE)
+```
+
+```{r}
+lm_data <- lm_data %>%
+  select(-c(quarter, sex, race, race, hospi))
+```
+
+```{r}
+score_fit <- lm(score~., data = lm_data)
+```
+
+```{r}
+summary(score_fit)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
